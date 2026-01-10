@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>/// CYBERDECK ASCII INTERFACE ///</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Terminal Theme Colors --- */
+        :root {
+            --text-color: #00FF00; /* Neon Green */
+            --bg-color: #0A0A0A; /* Deep Black */
+            --border-color: #008800; /* Medium Green */
+            --shadow-color: rgba(0, 255, 0, 0.7); /* Bright Shadow */
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Roboto Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            /* Hide the native cursor for the custom dot (Default for desktop) */
+            cursor: none; 
+            /* Subtle CRT Scanline effect for atmosphere */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.3) 1px, transparent 1px);
+            background-size: 100% 2px;
+        }
+
+        /* --- Custom Mouse Dot --- */
+        #mouse-dot {
+            position: fixed;
+            pointer-events: none; /* Allows clicks to pass through */
+            z-index: 9999;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-color);
+            /* Stronger glowing effect for the dot */
+            box-shadow: 0 0 5px var(--text-color), 0 0 15px var(--text-color), 0 0 25px rgba(0, 255, 0, 0.8);
+            /* This centers the dot on the cursor position set by top/left */
+            transform: translate(-50%, -50%); 
+        }
+
+        /* NEW: Disable custom cursor functionality on mobile viewports */
+        @media (max-width: 639px) {
+            #mouse-dot {
+                display: none !important;
+            }
+            /* Restore the system cursor on mobile, since the custom dot is hidden */
+            body {
+                cursor: default !important;
+            }
+        }
+
+        /* --- Main Terminal Frame --- */
+        .terminal-frame {
+            border: 2px solid var(--border-color);
+            /* Intense, visible glow */
+            box-shadow: 0 0 25px var(--shadow-color), inset 0 0 10px rgba(0, 255, 0, 0.3);
+            padding: 40px 20px;
+            max-width: 900px;
+            width: 95%;
+            background-color: #111;
+            /* Subtle flickering animation */
+            animation: flicker 0.1s infinite alternate;
+        }
+        
+        @keyframes flicker {
+            0% { box-shadow: 0 0 25px var(--shadow-color), inset 0 0 10px rgba(0, 255, 0, 0.3); }
+            100% { box-shadow: 0 0 20px var(--shadow-color), inset 0 0 8px rgba(0, 255, 0, 0.25); }
+        }
+
+        h1 { 
+            font-size: 1.8rem;
+            text-align: center;
+            /* Text glow */
+            text-shadow: 0 0 5px var(--text-color), 0 0 10px rgba(0, 255, 0, 0.5);
+            margin-bottom: 30px; 
+            border-bottom: 2px dashed var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        /* --- CUSTOM FILE INPUT & BUTTON STYLING --- */
+        .custom-file-label, .terminal-button {
+            display: block;
+            text-align: center;
+            padding: 12px 20px;
+            border: 2px solid var(--text-color);
+            background-color: #000;
+            font-weight: 700;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 0 5px var(--text-color); 
+            text-shadow: 0 0 3px var(--text-color);
+            letter-spacing: 1px;
+            cursor: pointer;
+            color: var(--text-color); /* Ensure text color is set */
+        }
+
+        .custom-file-label {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        /* Specific sizing for the smaller copy button */
+        .terminal-button {
+            padding: 4px 10px; 
+            font-size: 0.75rem; /* text-xs equivalent */
+            display: inline-block; /* Ensure it stays in line with the header */
+        }
+
+
+        .custom-file-label:hover, .terminal-button:hover {
+            background-color: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 10px var(--text-color), 0 0 20px rgba(0, 255, 0, 0.5); 
+            border-color: #00FF00;
+        }
+        
+        .hidden-file-input {
+            width: 0.1px;
+            height: 0.1px;
+            opacity: 0;
+            overflow: hidden;
+            position: absolute;
+            z-index: -1;
+        }
+
+        /* --- Output Terminal --- */
+        #asciiOutput {
+            white-space: pre; 
+            background: #000;
+            padding: 15px;
+            border-radius: 2px;
+            overflow: auto;
+            max-width: 100%;
+            height: 400px;
+            border: 1px solid var(--border-color);
+            line-height: 0.8; /* Tighter line height for better detail */
+            font-size: 0.4rem; /* Even smaller font size for higher resolution */
+            text-shadow: 0 0 1px var(--text-color); /* Subtle text glow */
+        }
+        
+        @media (min-width: 768px) {
+            #asciiOutput {
+                font-size: 0.5rem; /* Adjust desktop size slightly */
+            }
+        }
+
+        /* Blinking cursor effect for a terminal feel */
+        .blinking-cursor::after {
+            content: '_';
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            from, to { color: transparent }
+            50% { color: var(--text-color) }
+        }
+        
+        #statusMessage {
+            text-shadow: 0 0 5px rgba(255, 0, 0, 0.8);
+        }
+
+        #imagePreviewContainer {
+            border: 1px solid var(--border-color);
+            box-shadow: 0 0 5px var(--shadow-color);
+        }
+
+        .terminal-header {
+            color: #00AA00; /* Brighter green for header text */
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Custom Mouse Dot Element -->
+    <div id="mouse-dot"></div>
+    
+    <div class="terminal-frame flex flex-col items-center">
+        <h1>/// DATASTREAM DECODER [INSTANT MODE] ///</h1>
+
+        <!-- Instruction -->
+        <div class="text-sm mb-4">
+            >> **INITIATING DECODE SEQUENCE.** Select image file to render:
+        </div>
+
+        <!-- File Input (Now a custom-styled label linking to a hidden input) -->
+        <label for="fileInput" class="custom-file-label">
+            >> [EXECUTE] Upload Image File
+        </label>
+        <input type="file" id="fileInput" accept="image/*" class="hidden-file-input">
+
+        <!-- Status Message Area -->
+        <div id="statusMessage" class="h-6 text-sm mb-4 text-center"></div>
+        
+        <!-- Image Preview (Hidden by default) -->
+        <div id="imagePreviewContainer" class="mb-6 hidden">
+            <h2 class="terminal-header text-xs mb-2">// SOURCE FILE: PREVIEW_BUFFER //</h2>
+            <img id="imagePreview" class="max-h-40 w-auto object-contain p-1" alt="Source Image" />
+        </div>
+
+        <!-- Output Area Header and Copy Button (NEW STRUCTURE) -->
+        <div class="w-full flex justify-between items-end mb-2">
+            <h2 class="terminal-header text-sm">// RENDERED OUTPUT: ASCII_MATRIX //</h2>
+            <button id="copyAsciiButton" class="terminal-button hidden">
+                >> [COPY ASCII]
+            </button>
+        </div>
+        
+        <!-- ASCII Output Display -->
+        <pre id="asciiOutput" class="w-full blinking-cursor">Awaiting File Input...</pre>
+    </div>
+
+    <script>
+        // --- Setup and Constants ---
+        
+        // This character map is crucial for the intensity->character mapping (Darkest to Lightest)
+        const ASCII_CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. "; 
+
+        // DOM Elements
+        const fileInput = document.getElementById('fileInput');
+        const asciiOutput = document.getElementById('asciiOutput');
+        const statusMessage = document.getElementById('statusMessage');
+        const imagePreview = document.getElementById('imagePreview');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const mouseDot = document.getElementById('mouse-dot'); 
+        const copyAsciiButton = document.getElementById('copyAsciiButton');
+
+        // State variables
+        let currentAsciiText = null; 
+        const originalCopyButtonText = ">> [COPY ASCII]";
+
+
+        // --- Utility Functions ---
+
+        /**
+         * Displays a status message to the user.
+         */
+        function showStatus(message, isError = false) {
+            statusMessage.textContent = message;
+            statusMessage.style.color = isError ? '#ff4141' : '#00FF00';
+            statusMessage.style.textShadow = isError ? '0 0 5px rgba(255, 65, 65, 0.8)' : '0 0 5px rgba(0, 255, 0, 0.8)';
+        }
+
+        /**
+         * Converts the image data from the canvas into ASCII art.
+         */
+        function generateAsciiArt(imageData, width, height) {
+            const data = imageData.data;
+            let ascii = "";
+            const charLength = ASCII_CHARS.length;
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const offset = (y * width + x) * 4;
+                    const r = data[offset];
+                    const g = data[offset + 1];
+                    const b = data[offset + 2];
+                    
+                    // Standard luminance formula for better gray-scale accuracy
+                    const luminosity = (0.2126 * r + 0.7152 * g + 0.0722 * b); 
+                    
+                    // Map brightness (0-255) to character index (0 to charLength-1)
+                    const charIndex = Math.floor((luminosity / 255) * (charLength - 1));
+                    
+                    ascii += ASCII_CHARS[charIndex];
+                }
+                ascii += "\n";
+            }
+            return ascii;
+        }
+
+        /**
+         * Simulates a typing effect for the ASCII art.
+         */
+        function typeAsciiArt(text, element, speed = 0) {
+            let i = 0;
+            // Store the text before typing starts
+            currentAsciiText = text; 
+            
+            // Setup for typing
+            element.classList.add('blinking-cursor');
+            element.textContent = ""; 
+            copyAsciiButton.classList.add('hidden');
+
+            // Reset copy button text and color in case it was showing "COPIED!"
+            copyAsciiButton.textContent = originalCopyButtonText;
+            copyAsciiButton.style.color = 'var(--text-color)';
+            copyAsciiButton.style.borderColor = 'var(--text-color)';
+
+            function type() {
+                if (i < text.length) {
+                    const chunk = text.substring(i, Math.min(i + 50, text.length));
+                    element.textContent += chunk;
+                    i += chunk.length;
+                    
+                    setTimeout(type, speed); 
+                } else {
+                    // Typing finished, remove the blinking cursor and show the copy button
+                    element.classList.remove('blinking-cursor');
+                    copyAsciiButton.classList.remove('hidden');
+                    showStatus("DECODE SUCCESS: [OUTPUT_RENDERED]", false);
+                }
+            }
+
+            // Start typing
+            type();
+        }
+
+        /**
+         * Main function to handle image processing and ASCII generation.
+         */
+        function handleImageProcessing(file) {
+            // Safety check: Limit file size to prevent memory crashes (5MB limit)
+            const MAX_FILE_SIZE = 5 * 1024 * 1024; 
+            if (file.size > MAX_FILE_SIZE) {
+                showStatus("ERROR: File size exceeds 5MB limit. [TERMINATING]", true);
+                imagePreviewContainer.classList.add('hidden');
+                return;
+            }
+            
+            showStatus("PROCESSING IMAGE: [FILE_LOADED]", false);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.src = e.target.result;
+                
+                // Display preview
+                imagePreview.src = e.target.result;
+                imagePreviewContainer.classList.remove('hidden');
+
+                img.onload = function() {
+                    console.log("Image loaded successfully. Starting canvas rendering."); // DEBUG LOG
+                    showStatus("PROCESSING IMAGE: [DIMENSIONS_CALCULATED]", false);
+                    
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Define output resolution
+                    const targetWidth = 200; 
+                    // Calculate height, compensating for the height/width ratio of monospace characters (approx 0.55)
+                    const targetHeight = Math.floor((img.height / img.width) * targetWidth * 0.55);
+                    
+                    if (targetHeight === 0 || targetWidth === 0) {
+                         showStatus("ERROR: Invalid image dimensions (0 width/height).", true);
+                         return;
+                    }
+
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+
+                    // Draw the image scaled down to the target resolution
+                    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                    
+                    // Get pixel data
+                    const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+                    
+                    showStatus("PROCESSING IMAGE: [PIXEL_MAPPING_STARTED]", false);
+
+                    // Generate the ASCII text
+                    const ascii = generateAsciiArt(imageData, targetWidth, targetHeight);
+                    
+                    // Output the result using the typing animation
+                    showStatus("PROCESSING IMAGE: [TYPING_OUTPUT]", false);
+                    typeAsciiArt(ascii, asciiOutput, 0); 
+                };
+                
+                img.onerror = function() {
+                    console.error("Image object reported an error loading source data.");
+                    showStatus("ERROR: Failed to load image file (Corrupt/Invalid).", true);
+                    imagePreviewContainer.classList.add('hidden');
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // --- Event Listeners ---
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            asciiOutput.classList.add('blinking-cursor');
+            asciiOutput.textContent = "Awaiting File Input...";
+            copyAsciiButton.classList.add('hidden'); // Ensure copy button is hidden on new input
+            
+            if (file) {
+                handleImageProcessing(file);
+            } else {
+                showStatus("INTERFACE STANDBY", false);
+                imagePreviewContainer.classList.add('hidden');
+            }
+        });
+
+        copyAsciiButton.addEventListener('click', () => {
+            if (currentAsciiText) {
+                // Use execCommand('copy') for better compatibility in iFrames
+                const tempInput = document.createElement('textarea'); 
+                tempInput.value = currentAsciiText;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                
+                try {
+                    document.execCommand('copy');
+                    showStatus(`ASCII MATRIX COPIED TO CLIPBOARD.`, false);
+                    
+                    // NEW BEHAVIOR: Show "COPIED!" and revert after 2 seconds
+                    copyAsciiButton.textContent = "COPIED!";
+                    copyAsciiButton.style.color = '#00FF00'; 
+                    copyAsciiButton.style.borderColor = '#00FF00';
+                    
+                    setTimeout(() => {
+                        copyAsciiButton.textContent = originalCopyButtonText;
+                        copyAsciiButton.style.color = 'var(--text-color)';
+                        copyAsciiButton.style.borderColor = 'var(--text-color)';
+                    }, 2000); // 2000 milliseconds = 2 seconds
+
+                } catch (err) {
+                    showStatus("ERROR: Copy failed.", true);
+                }
+                document.body.removeChild(tempInput);
+            } else {
+                 showStatus("ERROR: No ASCII matrix generated yet.", true);
+            }
+        });
+
+        // Mouse Follower Logic
+        document.addEventListener('mousemove', (e) => {
+            // Using top/left to position the element, letting CSS transform center it.
+            mouseDot.style.left = `${e.clientX}px`;
+            mouseDot.style.top = `${e.clientY}px`;
+        });
+
+        // Initialize display text on load
+        window.onload = () => {
+             // Set the initial copy button text
+             copyAsciiButton.textContent = originalCopyButtonText;
+
+             asciiOutput.textContent = "Awaiting File Input...";
+             asciiOutput.classList.add('blinking-cursor');
+             showStatus("INTERFACE STANDBY", false);
+        };
+        
+    </script>
+</body>
+</html>
